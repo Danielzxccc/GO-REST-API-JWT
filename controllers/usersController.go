@@ -3,6 +3,7 @@ package controllers
 import (
 	"go-jwt/initializers"
 	"go-jwt/models"
+	"go-jwt/utils"
 	"net/http"
 	"os"
 	"time"
@@ -25,6 +26,27 @@ func GetUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": users,
 	})
+}
+
+func FindUser(c *gin.Context) {
+	var user models.User
+
+	id := c.Param("id")
+
+	// validate id param
+	isValid := utils.ValidateSerial(id)
+	if !isValid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID"})
+		return
+	}
+	initializers.DB.First(&user, id)
+
+	if user.ID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": user})
 }
 
 func Signup(c *gin.Context) {

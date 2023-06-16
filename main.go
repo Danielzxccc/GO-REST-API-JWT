@@ -5,6 +5,7 @@ import (
 	"go-jwt/initializers"
 	"go-jwt/middleware"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +17,7 @@ func init() {
 
 func main() {
 	r := gin.Default()
+	r.Use(cors.Default())
 	// testing
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -23,7 +25,15 @@ func main() {
 		})
 	})
 	// auth routes
-	r.GET("/users", middleware.RequireAuth, controllers.GetUsers)
+
+	v1 := r.Group("/v1", middleware.RequireAuth)
+	{
+		v1.GET("/users", controllers.GetUsers)
+		v1.GET("/users/:id", controllers.FindUser)
+	}
+
+	// r.GET("/users", middleware.RequireAuth, controllers.GetUsers)
+	r.GET("/users/:id", controllers.FindUser)
 	r.POST("/signup", controllers.Signup)
 	r.POST("/login", controllers.Login)
 	r.DELETE("/logout", controllers.Logout)
