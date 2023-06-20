@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"go-jwt/initializers"
 	"go-jwt/models"
 	"go-jwt/utils"
@@ -61,7 +62,7 @@ func Signup(c *gin.Context) {
 		})
 		return
 	}
-	// hasing the password
+	// hashing the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
 
 	if err != nil {
@@ -114,6 +115,7 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid email or password",
 		})
+		return
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -127,19 +129,74 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Failed to generate token",
 		})
-
 		return
 	}
-	c.SetSameSite(http.SameSiteNoneMode)
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("Authorization", tokenString, 3600*24*7, "", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": tokenString,
+		"user":  user,
 	})
 
 }
 
+func Refresh(c *gin.Context) {
+	tokenString, err := c.Cookie("Authorization")
+
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// decode and validate the token string
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+		return []byte(os.Getenv("SECRET")), nil
+	})
+
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if float64(time.Now().Unix()) > claims["exp"].(float64) {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		subFloat, ok := claims["sub"].(float64)
+		if !ok {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		id := int64(subFloat) + 1
+		var user models.User
+		initializers.DB.First(&user, id)
+
+		if user.ID == 0 {
+			c.AbortWithStatus(http.StatusUnauthorized)
+		}
+
+		// send back the user
+		c.JSON(http.StatusOK, gin.H{
+			"user":  user,
+			"token": tokenString,
+		})
+
+	} else {
+		c.AbortWithStatus(http.StatusUnauthorized)
+	}
+}
+
 func Logout(c *gin.Context) {
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("Authorization", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Logged out successfully",

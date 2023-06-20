@@ -17,6 +17,7 @@ func RequireAuth(c *gin.Context) {
 
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
 
 	// decode and validate the token string
@@ -29,9 +30,15 @@ func RequireAuth(c *gin.Context) {
 		return []byte(os.Getenv("SECRET")), nil
 	})
 
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		if float64(time.Now().Unix()) > claims["exp"].(float64) {
 			c.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
 
 		subFloat, ok := claims["sub"].(float64)
@@ -53,7 +60,6 @@ func RequireAuth(c *gin.Context) {
 		c.Set("user", user)
 		c.Next()
 	} else {
-		fmt.Println(err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 	}
 

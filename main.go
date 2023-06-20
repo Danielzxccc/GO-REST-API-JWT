@@ -17,7 +17,12 @@ func init() {
 
 func main() {
 	r := gin.Default()
-	r.Use(cors.Default())
+
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:5173"}
+	config.AllowCredentials = true
+
+	r.Use(cors.New(config))
 	// testing
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -36,6 +41,7 @@ func main() {
 	r.GET("/users/:id", controllers.FindUser)
 	r.POST("/signup", controllers.Signup)
 	r.POST("/login", controllers.Login)
+	r.GET("/refresh", controllers.Refresh)
 	r.DELETE("/logout", controllers.Logout)
 
 	r.Run()
